@@ -4,10 +4,11 @@ import itertools
 import pickle
 import random
 import gc
+import os
 
 import numpy as np
 
-from chu_liu import Digraph
+from dependency_parser.chu_liu import Digraph
 
 ROOT_TOKEN = (0, '<ROOT>', '<ROOT-POS>')
 
@@ -209,6 +210,42 @@ class DependencyParser:
         features.append(('c-pos', child_token[2]))
         return features
 
+    @staticmethod
+    def edge2rawfeature2(parent_token, child_token):
+        features = DependencyParser.edge2rawfeature1(parent_token, child_token)
+        features.append(('distance', abs(parent_token[0] - child_token[0])))
+        features.append(('p-word, p-pos, c-word, c-pos',
+                         parent_token[1],
+                         parent_token[2],
+                         child_token[1],
+                         child_token[2]))
+        features.append(('p-word, c-word, c-pos',
+                         parent_token[1],
+                         child_token[1],
+                         child_token[2]))
+        features.append(('p-word, p-pos, c-word',
+                         parent_token[1],
+                         parent_token[2],
+                         child_token[1]))
+        features.append(('p-word, c-word', parent_token[1], child_token[1]))
+        features.append(('parent_before_child', parent_token[0] < child_token[0]))
+        
+        if len(parent_token[1]) >= 4 and len(child_token[1]) >= 4:
+            features.append(('4p-word, 4c-word', parent_token[1][:4], child_token[1][:4]))
+            features.append(('p-word4, c-word4', parent_token[1][-4:], child_token[1][-4:]))
+
+        if len(parent_token[1]) >= 3 and len(child_token[1]) >= 3:
+            features.append(('3p-word, 3c-word', parent_token[1][:3], child_token[1][:3]))
+            features.append(('p-word3, c-word3', parent_token[1][-3:], child_token[1][-3:]))
+
+        if len(parent_token[1]) >= 2 and len(child_token[1]) >= 2:
+            features.append(('2p-word, 2c-word', parent_token[1][:2], child_token[1][:2]))
+            features.append(('p-word2, c-word3', parent_token[1][-2:], child_token[1][-2:]))
+        
+
+
+        return features
+
     def rawgraph2featuregraph(self, rawgraph):
         """Converts rawgraph to featuregraph."""
         featuregraph = {}
@@ -269,7 +306,7 @@ class DependencyParser:
                                                         tokenized_sent)
         return predicted_tokenized_sent
 
-    def optimize(self, data, n_epochs, log_interval=200, lr=1, fname_prefix='log_'):
+    def optimize(self, train_data, test_data=None, n_epochs=100, log_interval=200, lr=1, fname_prefix='log_'):
         """Structured perceptron optimization.
 
         Args:
@@ -285,12 +322,13 @@ class DependencyParser:
         global_step = 0
         train_log = [0.0]
         accuracy = []
+        test_accuracy = [0]
         score = GetScore()
         score.w = self.w
 
         for epoch in range(n_epochs):
-            random.shuffle(data)
-            for d in data:
+            random.shuffle(train_data)
+            for d in train_data:
                 global_step += 1
                 score.feature_graph = d['feature_template_graph']
                 digraph = Digraph(d['template_graph'],
@@ -315,7 +353,10 @@ class DependencyParser:
 
                 if global_step % log_interval == 0 or global_step in [1, 5, 10]:
                     average_accuracy = np.mean(accuracy)
-                    print_log({'acc': average_accuracy, 'epoch': epoch, 'step': global_step})
+                    print_log({'acc': average_accuracy,
+                               'acc_test': test_accuracy[-1],
+                               'epoch': epoch,
+                               'step': global_step})
                     train_log.append(average_accuracy)
                     accuracy = []
                 
@@ -328,6 +369,8 @@ class DependencyParser:
             if accuracy:
                 train_log.append(np.mean(accuracy))
                 accuracy = []
+            if test_data is not None:
+                test_accuracy.append(self.compute_accuracy(test_data))
             gc.collect()
 
         with open(fname_prefix + 'weights.pkl', 'wb') as fo:
@@ -335,6 +378,18 @@ class DependencyParser:
 
         with open(fname_prefix + 'accuracy.pkl', 'wb') as fo:
             pickle.dump(train_log, fo, protocol=pickle.HIGHEST_PROTOCOL)
+
+        with open(fname_prefix + 'test_accuracy.pkl', 'wb') as fo:
+            pickle.dump(test_accuracy, fo, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def compute_accuracy(self, tokenized_sents):
+        accuracy = []
+        for actual_sent in tokenized_sents:
+            predicted_sent = self.predict(actual_sent)
+            accuracy.append(compute_accuracy(actual_sent[1:],
+                                             predicted_sent[1:]))
+        return np.mean(accuracy)
+
 
 class GetScore:
     """Helper for calculating score of the edge."""
