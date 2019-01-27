@@ -38,8 +38,7 @@ def raw_data2tokenized_sents(raw_data):
             try:
                 sent.append((int(w[0]), w[1], w[3], int(w[6])))
             except:
-                print(w)
-                raise
+                sent.append((int(w[0]), w[1], w[3]))
         raw_sents.append(sent)
     return raw_sents
 
@@ -399,3 +398,93 @@ class GetScore:
             return self.w[self.feature_graph[edge]].sum()
         else:
             return 0.0
+
+def edge2rawfeature10(parent_token, child_token):
+    """Creates features for the second model."""
+    features = []
+    features.append(('p-word, p-pos', parent_token[1], parent_token[2]))
+    features.append(('p-word', parent_token[1]))
+    features.append(('p-pos', parent_token[2]))
+    features.append(('p-pos, c-word, c-pos',
+                     parent_token[2],
+                     child_token[1],
+                     child_token[2]))
+    features.append(('p-word, p-pos, c-pos',
+                     parent_token[1],
+                     parent_token[2],
+                     child_token[2]))
+    features.append(('p-pos, c-pos',
+                     parent_token[2],
+                     child_token[2]))
+    features.append(('c-word, c-pos',
+                     child_token[1],
+                     child_token[2]))
+    features.append(('c-word', child_token[1]))
+    features.append(('c-pos', child_token[2]))
+    
+    features.append(('p-word, p-pos, c-word, c-pos',
+                     parent_token[1],
+                     parent_token[2],
+                     child_token[1],
+                     child_token[2]))
+    features.append(('p-word, c-word, c-pos',
+                     parent_token[1],
+                     child_token[1],
+                     child_token[2]))
+    features.append(('p-word, p-pos, c-word',
+                     parent_token[1],
+                     parent_token[2],
+                     child_token[1]))
+    features.append(('p-word, c-word', parent_token[1], child_token[1]))
+    features.append(('parent_before_child', parent_token[0] < child_token[0]))
+
+    features.append(('p-pos, c-pos, dist',
+                     parent_token[2],
+                     child_token[2],
+                     abs(parent_token[0] - child_token[0])))
+    ###################################################################
+    features.append(('p-word, c-word, dist',
+                     parent_token[1],
+                     child_token[1],
+                     abs(parent_token[0] - child_token[0])))
+    ###################################################################
+    if len(parent_token[1]) >= 4 and len(child_token[1]) >= 4:
+        features.append(('4p-word, 4c-word', parent_token[1][:4], child_token[1][:4]))
+        features.append(('p-word4, c-word4', parent_token[1][-4:], child_token[1][-4:]))
+
+    if len(parent_token[1]) >= 3 and len(child_token[1]) >= 3:
+        features.append(('3p-word, 3c-word', parent_token[1][:3], child_token[1][:3]))
+        features.append(('p-word3, c-word3', parent_token[1][-3:], child_token[1][-3:]))
+
+    if len(parent_token[1]) >= 2 and len(child_token[1]) >= 2:
+        features.append(('2p-word, 2c-word', parent_token[1][:2], child_token[1][:2]))
+        features.append(('p-word2, c-word3', parent_token[1][-2:], child_token[1][-2:]))
+    
+    ###################################################################
+    if len(parent_token[1]) >= 4 and len(child_token[1]) >= 4:
+        features.append(('4p-word, 4c-word, p-pos', parent_token[1][:4], child_token[1][:4], parent_token[2]))
+        features.append(('p-word4, c-word4, p-pos', parent_token[1][-4:], child_token[1][-4:], parent_token[2]))
+
+    if len(parent_token[1]) >= 3 and len(child_token[1]) >= 3:
+        features.append(('3p-word, 3c-word, p-pos', parent_token[1][:3], child_token[1][:3], parent_token[2]))
+        features.append(('p-word3, c-word3, p-pos', parent_token[1][-3:], child_token[1][-3:], parent_token[2]))
+
+    if len(parent_token[1]) >= 2 and len(child_token[1]) >= 2:
+        features.append(('2p-word, 2c-word, p-pos', parent_token[1][:2], child_token[1][:2], parent_token[2]))
+        features.append(('p-word2, c-word3, p-pos', parent_token[1][-2:], child_token[1][-2:], parent_token[2]))
+    
+    ###################################################################
+    if len(parent_token[1]) >= 4 and len(child_token[1]) >= 4:
+        features.append(('4p-word, 4c-word, c-pos', parent_token[1][:4], child_token[1][:4], child_token[2]))
+        features.append(('p-word4, c-word4, c-pos', parent_token[1][-4:], child_token[1][-4:], child_token[2]))
+
+    if len(parent_token[1]) >= 3 and len(child_token[1]) >= 3:
+        features.append(('3p-word, 3c-word, c-pos', parent_token[1][:3], child_token[1][:3], child_token[2]))
+        features.append(('p-word3, c-word3, c-pos', parent_token[1][-3:], child_token[1][-3:], child_token[2]))
+
+    if len(parent_token[1]) >= 2 and len(child_token[1]) >= 2:
+        features.append(('2p-word, 2c-word, c-pos', parent_token[1][:2], child_token[1][:2], child_token[2]))
+        features.append(('p-word2, c-word3, c-pos', parent_token[1][-2:], child_token[1][-2:], child_token[2]))
+    
+    
+    return features
